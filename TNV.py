@@ -29,20 +29,21 @@ logging.info('***MONITOREO, IDENTIFICACION y LOCALIZACION de Tremors No Volcanic
 try: 
     import time
     t=time.time()
-    logging.info("Cargando librerias...")
+    print("Cargando librerias...")
     import numpy as np
-    import pandas as pd
     import matplotlib.pyplot as plt
     import obspy
     import cartopy
-    from obspy.clients.fdsn import Client
+    from obspy.clients.filesystem.sds import Client
+    from obspy.clients.fdsn import Client as ClientF 
     from obspy import UTCDateTime,Stream,read_inventory,read
-    import obspy.signal
+    from obspy.signal.trigger import z_detect,plot_trigger
+    import wget
     from os import mkdir
     from threading import Thread
     from datetime import datetime
-    import queue
-    import TNVfun as tnv
+    import pandas as pd
+    from xcorr import correlate_maxlag, correlate_template, get_lags
     secs = time.time() - t
     logging.info("Librerias cargadas en " + str(secs) + " segundos.")
 except Exception as e:
@@ -53,7 +54,7 @@ except Exception as e:
 def main():
     # Declaracion de Variables
     #logging.info("Cargando inventario...")
-    inv = read_inventory(".\\archivo\\CM.CDT.01.dataless")
+    inv = read_inventory(dirPath + "\\archivo\\CM.CDT.01.dataless")
     #logging.info("Inventario cargado.")
     #queueR = queue()
     
@@ -94,13 +95,6 @@ def main():
     
     #st.detrend("linear")
     #logging.info("Impreso DETREND...") 
-    
-    # Figura mapa de las estaciones
-    fig1 = plt.figure("Ortho")
-    inv.plot(projection='ortho', method='cartopy', show=False, fig="fig1") # global # local
-    fig1.show()
-    inv.plot(projection='global', method='cartopy', show=False, fig="fig2") # global # local
-    
     while True:
         time.sleep(5)
 
