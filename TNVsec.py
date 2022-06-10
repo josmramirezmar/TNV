@@ -96,21 +96,15 @@ while(dateStart < UTCDateTime.now()):
     except Exception as e:
         logging.error("Error almacenando el mseed del " + str(dateStart.strftime("%Y-%m-%dT%H:%M")) + ": " + str(e))
 
-
-    # Tratamiento previo a la traza
-    try:
-        st2 = st.select(component="Z")
-        st2.merge(method=1, fill_value='interpolate', interpolation_samples=-1)
-        logging.info("Trazas del " + str(dateStart.strftime("%Y-%m-%dT%H:%M")) + " unidas correctamente.")
-    except Exception as e:
-        logging.error("Error unindo las trazas del " + str(dateStart.strftime("%Y-%m-%dT%H:%M")) + ": " + str(e))
-
     # Plot RAW
     rawName = network + "_" + dateStart.strftime("%Y-%m-%dT%H-%M") + "_RAW.png"
     dirRaw = os.path.join(dirPath, dirResultado, rawName)
 
+    # Seleccion de componente
+    #st = st.select(component="Z")
+
     try:
-        st2.plot(method='full', equal_scale=False, outfile=dirRaw)
+        st.plot(method='full', equal_scale=False, outfile=dirRaw)
         logging.info("RAW mseed del " + str(dateStart.strftime("%Y-%m-%dT%H:%M")) + " ploteado correctamente.")
     except Exception as e:
         logging.error("Error ploteando el RAW mseed del " + str(dateStart.strftime("%Y-%m-%dT%H:%M")) + ": " + str(e))
@@ -120,8 +114,8 @@ while(dateStart < UTCDateTime.now()):
     dirDet = os.path.join(dirPath, dirResultado, detName)
 
     try:
-        st2.detrend()
-        st2.plot(method='full', equal_scale=False, outfile=dirDet)
+        st.detrend()
+        st.plot(method='full', equal_scale=False, outfile=dirDet)
         logging.info("DETREND mseed del " + str(dateStart.strftime("%Y-%m-%dT%H:%M")) + " ploteado correctamente.")
     except Exception as e:
         logging.error("Error ploteando el DETREND del " + str(dateStart.strftime("%Y-%m-%dT%H:%M")) + ": " + str(e))
@@ -131,27 +125,88 @@ while(dateStart < UTCDateTime.now()):
     dirFil = os.path.join(dirPath, dirResultado, filName)
 
     try:
-        st2.filter("bandpass", freqmin=1, freqmax=3, corners=2, zerophase=True)
-        st2.plot(method='full', equal_scale=False, outfile=dirFil)
+        st.filter("bandpass", freqmin=1, freqmax=10, corners=2, zerophase=True)
+        st.plot(method='full', equal_scale=False, outfile=dirFil)
         logging.info("FILTRAO mseed del " + str(dateStart.strftime("%Y-%m-%dT%H:%M")) + " ploteado correctamente.")
     except Exception as e:
         logging.error("Error ploteando el FILTRADO del " + str(dateStart.strftime("%Y-%m-%dT%H:%M")) + ": " + str(e))
+        
+    # Plot RESPUESTA INSTRUMENTAL
+    RIName = network + "_" + dateStart.strftime("%Y-%m-%dT%H-%M") + "_RI.png"
+    dirRI = os.path.join(dirPath, dirResultado, RIName)
+
+    try:
+        st.remove_response(inventory=inv, output="DEF", water_level=60, fig=dirRI)
+        logging.info("RESPUESTA INSTRUMENTAL mseed del " + str(dateStart.strftime("%Y-%m-%dT%H:%M")) + " ploteado correctamente.")
+    except Exception as e:
+        logging.error("Error ploteando LA RESPUESTA INSTRUMENTAL del " + str(dateStart.strftime("%Y-%m-%dT%H:%M")) + ": " + str(e))
+        
+    # Plot MERGE
+    MerName = network + "_" + dateStart.strftime("%Y-%m-%dT%H-%M") + "_MER.png"
+    dirMer = os.path.join(dirPath, dirResultado, MerName)
+
+
+    try:
+        st.merge(method=1, fill_value='interpolate', interpolation_samples=-1)
+        st.plot(method='full', equal_scale=False, outfile=dirMer)
+        logging.info("Trazas del " + str(dateStart.strftime("%Y-%m-%dT%H:%M")) + " unidas correctamente.")
+    except Exception as e:
+        logging.error("Error unindo las trazas del " + str(dateStart.strftime("%Y-%m-%dT%H:%M")) + ": " + str(e))
 
     # Plot NORMALIZADO
     norName = network + "_" + dateStart.strftime("%Y-%m-%dT%H-%M") + "_NOR.png"
     dirNor = os.path.join(dirPath, dirResultado, norName)
 
     try:
-        st2.normalize(global_max=False) 
-        st2.plot(method='full', equal_scale=False, outfile=dirNor)
+        st.normalize(global_max=False) 
+        st.plot(method='full', equal_scale=False, outfile=dirNor)
         logging.info("NORMALIZADO mseed del " + str(dateStart.strftime("%Y-%m-%dT%H:%M")) + " ploteado correctamente.")
     except Exception as e:
         logging.error("Error ploteando el NORMALIZADO del " + str(dateStart.strftime("%Y-%m-%dT%H:%M")) + ": " + str(e))
         
-    dateStart = dateStart + (2*60)
+    # Plot COMPONENTE Z
+    zName = network + "_" + dateStart.strftime("%Y-%m-%dT%H-%M") + "_Z.png"
+    dirZ = os.path.join(dirPath, dirResultado, zName)
 
-#df = st[1].stats.sampling_rate
-#cft = z_detect(st[1].data, int(10 * df))
-#plot_trigger(st[1], cft, 0.5, 0.5)
+    try:
+        st2 = st.select(component="Z")
+        st2.plot(method='full', equal_scale=False, outfile=dirZ)
+        logging.infont("COMPONENTE Z mseed del " + str(dateStart.strftime("%Y-%m-%dT%H:%M")) + " ploteado correctamente.")
+    except Exception as e:
+        logging.error("Error ploteando el COMPONENTE Z del " + str(dateStart.strftime("%Y-%m-%dT%H:%M")) + ": " + str(e))
+    
+    # CORRELACION CRUZADA (xcorr)
+    maxlag = 10
+
+    for tr1 in st2:
+        a = tr1.data
+        aName = tr1.id
+        
+        for tr2 in st2:
+            b = tr2.data
+            bName = tr2.id
+            
+            corrName = network + "_" + dateStart.strftime("%Y-%m-%dT%H-%M") + "_CORR_" + aName[3:-7] + "-" + bName[3:-7] + ".png"
+            dirCORR = os.path.join(dirPath, dirResultado, corrName)
+            
+            try:
+                cc1 = correlate_maxlag(a, b, maxlag)
+
+                grid = plt.GridSpec(2, 1, wspace=0.4, hspace=0.3)
+                ax1 = plt.subplot(grid[0, 0])
+                ax2 = plt.subplot(grid[1, 0])
+                ax1.plot(np.arange(len(a)), a, label='signal {}'.format(aName))
+                ax1.plot(np.arange(len(b)), b, label='signal {}'.format(bName))
+                ax2.plot(get_lags(cc1), cc1)
+                ax1.legend(loc=3)
+                kw = dict(xy=(0.05, 0.95), xycoords='axes fraction', va='top')
+                ax2.annotate('correlate_maxlag(a, b, {})'.format(maxlag), **kw)
+                plt.savefig(dirCORR)
+                
+                logging.info("_CORR_" + aName[3:-7] + "-" + bName[3:-7] + " del " + str(dateStart.strftime("%Y-%m-%dT%H:%M")) + " ploteado correctamente.")
+            except Exception as e:
+                logging.error("Error ploteando _CORR_" + aName[3:-7] + "-" + bName[3:-7] + " del " + str(dateStart.strftime("%Y-%m-%dT%H:%M")) + ": " + str(e))
+        
+    dateStart = dateStart + (2*60)
 
 
